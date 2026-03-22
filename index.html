@@ -1,0 +1,245 @@
+<!--
+  =============================================================================
+  CHESS COACH — index.html (page structure)
+  =============================================================================
+  TEACHING NOTES:
+  - This is a "single-page app" layout: one HTML file, four logical screens
+    (tabs). Only one <main> section is visible at a time; JavaScript toggles
+    the .active class on tab buttons and matching .tab-content panels.
+  - External libraries (loaded at the bottom):
+    • jQuery          — DOM helpers; chessboard-js expects it.
+    • chess.js        — rules, FEN, legal moves, PGN (no graphics).
+    • chessboard-js   — draggable board UI (needs chess.js for game logic).
+  - Our scripts run AFTER those libraries so `Chess`, `Chessboard`, and `$`
+    exist when app.js runs. Order matters: engine → chesscom → openings-db → app.
+  =============================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- UTF-8 supports chess symbols and all languages -->
+  <meta charset="UTF-8">
+  <!-- Viewport: mobile browsers scale the page sensibly -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chess Coach</title>
+  <!-- Our theme and layout (colors, flex, cards, board size) -->
+  <link rel="stylesheet" href="style.css">
+  <!-- chessboard-js default piece/board skin (square classes it injects) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+</head>
+<body>
+
+<!-- Site title bar (static) -->
+<header>
+  <div class="logo">♛ Chess Coach</div>
+  <div class="subtitle">Stockfish · chess.com · Opening Explorer</div>
+</header>
+
+<!--
+  Tab bar: each button has data-tab="practice|review|puzzles|openings".
+  app.js listens for clicks, shows #tab-<name>, and calls initTab() once per tab.
+-->
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="practice">⚔ Practice</button>
+  <button class="tab-btn" data-tab="review">🔍 Game Review</button>
+  <button class="tab-btn" data-tab="puzzles">🧩 Puzzles</button>
+  <button class="tab-btn" data-tab="openings">📖 Openings</button>
+</nav>
+
+<main>
+
+  <!-- ========== PRACTICE TAB ==========
+       Live board + optional engine opponent. IDs here are wired in app.js:
+       practice-board, eval bar, history, depth slider, etc. -->
+  <div id="tab-practice" class="tab-content active">
+    <div class="board-wrap">
+      <!-- Eval bar: JS sets height of #eval-white from engine score -->
+      <div class="eval-bar">
+        <div class="eval-white" id="eval-white"></div>
+        <div class="eval-label" id="eval-label">0.0</div>
+      </div>
+      <!-- chessboard-js mounts here (480×480 in CSS) -->
+      <div id="practice-board" class="board"></div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div class="card-title">Settings</div>
+        <div class="row">
+          <span class="lbl">Play as</span>
+          <div class="btn-group">
+            <button class="btn sm active" id="play-white">White</button>
+            <button class="btn sm" id="play-black">Black</button>
+          </div>
+        </div>
+        <div class="row">
+          <span class="lbl">Mode</span>
+          <!-- engine = you vs Stockfish; analysis = engine hints only; free = no engine -->
+          <select id="practice-mode">
+            <option value="engine">vs Engine</option>
+            <option value="analysis">Analysis</option>
+            <option value="free">Free Play</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="lbl">Strength <span id="depth-val">12</span></span>
+          <input type="range" id="engine-depth" min="1" max="20" value="12">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Best Move</div>
+        <div id="best-move" class="big-move">—</div>
+        <div id="pv-line" class="pv"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Move History</div>
+        <div id="practice-history" class="movelist"></div>
+      </div>
+
+      <div class="card">
+        <div class="btn-group wrap">
+          <button class="btn" id="new-game">New Game</button>
+          <button class="btn" id="flip-practice">Flip</button>
+          <button class="btn" id="undo-move">Undo</button>
+        </div>
+        <div id="practice-status" class="status"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== GAME REVIEW TAB ==========
+       Fetch user's games from chess.com, step through PGN, run full-game analysis. -->
+  <div id="tab-review" class="tab-content">
+    <div class="full-panel card">
+      <div class="card-title">Load Games from chess.com</div>
+      <div class="input-row">
+        <input type="text" id="cc-username" class="txt-input" placeholder="Enter chess.com username">
+        <button class="btn" id="load-games">Load Games</button>
+      </div>
+      <div id="games-list"></div>
+    </div>
+
+    <!-- Hidden until a game is selected (see loadGameForReview in app.js) -->
+    <div id="review-board-wrap" class="board-wrap" style="display:none">
+      <div class="eval-bar">
+        <div class="eval-white" id="rv-eval-white"></div>
+        <div class="eval-label" id="rv-eval-label">0.0</div>
+      </div>
+      <div id="review-board" class="board"></div>
+    </div>
+
+    <div id="review-panel" class="panel" style="display:none">
+      <div class="card">
+        <div class="card-title">Game Info</div>
+        <div id="game-info"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Move Navigation</div>
+        <div class="btn-group wrap">
+          <button class="btn" id="rv-first">|◄</button>
+          <button class="btn" id="rv-prev">◄</button>
+          <button class="btn" id="rv-next">►</button>
+          <button class="btn" id="rv-last">►|</button>
+        </div>
+        <div class="hint">← → arrow keys also work</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Moves</div>
+        <div id="review-moves" class="movelist annotated"></div>
+      </div>
+      <div class="card">
+        <button class="btn full" id="analyze-game">Analyze Full Game</button>
+        <div id="analyze-progress" class="hint" style="margin-top:0.5rem"></div>
+      </div>
+      <div class="card" id="accuracy-card" style="display:none">
+        <div class="card-title">Accuracy Summary</div>
+        <div id="accuracy-grid" class="accuracy-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== PUZZLES TAB ==========
+       Daily/random from chess.com API; solution checked against engine line. -->
+  <div id="tab-puzzles" class="tab-content">
+    <div id="puzzle-board" class="board board-alone"></div>
+
+    <div class="panel">
+      <div class="card">
+        <div class="card-title">Puzzle</div>
+        <div id="puzzle-title" class="puzzle-title">Loading...</div>
+        <div id="puzzle-side" class="hint"></div>
+        <div id="puzzle-feedback" class="feedback"></div>
+        <div class="btn-group wrap">
+          <button class="btn" id="daily-puzzle">Daily</button>
+          <button class="btn" id="random-puzzle">Random</button>
+          <button class="btn" id="hint-btn">Hint</button>
+          <button class="btn" id="show-solution">Solution</button>
+        </div>
+      </div>
+      <div class="card" id="solution-card" style="display:none">
+        <div class="card-title">Solution</div>
+        <div id="solution-text" class="solution-text"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Stats</div>
+        <div class="puzzle-stats">
+          <div class="stat"><div id="p-solved">0</div><div>Solved</div></div>
+          <div class="stat"><div id="p-tried">0</div><div>Tried</div></div>
+          <div class="stat"><div id="p-pct">—</div><div>Rate</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== OPENINGS TAB ==========
+       Local opening book (openings-db.js); continuations list built from data. -->
+  <div id="tab-openings" class="tab-content">
+    <div id="openings-board" class="board board-alone"></div>
+
+    <div class="panel">
+      <div class="card">
+        <div id="opening-name" class="opening-name">Starting Position</div>
+        <div id="opening-eco" class="opening-eco"></div>
+        <div id="opening-desc" class="opening-desc">Make a move to start exploring openings.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Continuations</div>
+        <div id="continuations"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Move History</div>
+        <div id="opening-history" class="movelist"></div>
+      </div>
+      <div class="card">
+        <div class="btn-group wrap">
+          <button class="btn" id="op-back">◄ Back</button>
+          <button class="btn" id="op-reset">Reset</button>
+          <button class="btn" id="op-flip">Flip</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!--
+  Script order (dependencies):
+  1. jQuery — required by chessboard-js
+  2. chess.js — game state (used everywhere)
+  3. chessboard-js — visual board
+  4. engine.js — defines global `engine`
+  5. chesscom.js — defines global `ChessCom`
+  6. openings-db.js — lookupOpening, getContinuations
+  7. app.js — ties UI to logic
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/chesscom.js"></script>
+<script src="js/openings-db.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

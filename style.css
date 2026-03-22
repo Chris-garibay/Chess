@@ -1,0 +1,273 @@
+/**
+ * ============================================================================
+ * CHESS COACH — style.css
+ * ============================================================================
+ * TEACHING NOTES:
+ * - :root defines CSS *custom properties* (variables). Use var(--name) so you
+ *   can change the whole theme in one place — great for dark mode or rebranding.
+ * - Layout is mostly Flexbox: display:flex + gap aligns rows/columns without
+ *   fragile float hacks.
+ * - .tab-content uses display:none by default; .tab-content.active uses
+ *   display:flex — that show/hide is toggled from JavaScript in app.js.
+ * - chessboard-js draws the board inside a div; we fix .board width/height so
+ *   squares stay square. Media queries shrink the board on narrow screens.
+ * ============================================================================
+ */
+
+/* --- Design tokens: one palette for the whole app --- */
+:root {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --bg3: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --yellow: #d29922;
+  --orange: #f97316;
+  --red: #f85149;
+  --purple: #a78bfa;
+  --cyan: #22d3ee;
+}
+
+/* Reset: predictable box model; remove default margins on everything */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh; /* at least full viewport height */
+}
+
+/* --- Header: brand + tagline --- */
+header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0.9rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.logo { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+.subtitle { font-size: 0.8rem; color: var(--muted); }
+
+/* --- Tabs: underline shows active; hover brightens text --- */
+.tabs {
+  display: flex;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 1.5rem;
+}
+.tab-btn {
+  background: none; border: none;
+  color: var(--muted);
+  padding: 0.8rem 1.1rem;
+  font-size: 0.88rem; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all .2s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* --- Main: centered column; tab panels are flex rows (board + sidebar) --- */
+main { padding: 1.5rem 1.5rem; max-width: 1300px; margin: 0 auto; }
+
+.tab-content { display: none; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
+.tab-content.active { display: flex; }
+
+/* --- Board column: eval strip + chessboard side by side --- */
+.board-wrap { display: flex; gap: 0.5rem; align-items: flex-start; flex-shrink: 0; }
+.board { width: 480px; height: 480px; }
+.board-alone { width: 480px; height: 480px; flex-shrink: 0; }
+
+/* --- Eval bar: tall thin column; inner .eval-white height = engine advantage --- */
+.eval-bar {
+  width: 18px; height: 480px;
+  background: #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.eval-white {
+  background: #f0f0f0;
+  width: 100%; height: 50%; /* 50% = equal; JS animates height */
+  position: absolute; top: 0;
+  transition: height .5s ease;
+}
+.eval-label {
+  position: absolute; bottom: 3px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6rem; color: #888;
+  writing-mode: vertical-rl; /* read score bottom-to-top */
+  z-index: 1;
+}
+
+/* --- Sidebar: grows to fill space but caps width for readability --- */
+.panel { flex: 1; min-width: 260px; max-width: 370px; display: flex; flex-direction: column; gap: 0.9rem; }
+.full-panel { max-width: 100%; width: 100%; }
+
+/* --- Card: grouped controls with subtle border --- */
+.card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+}
+.card-title {
+  font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted);
+  margin-bottom: 0.7rem;
+}
+
+/* --- Form controls: match dark theme --- */
+.row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; font-size: 0.85rem; }
+.lbl { color: var(--muted); }
+
+.btn-group { display: flex; gap: 0.4rem; }
+.btn-group.wrap { flex-wrap: wrap; }
+
+.btn {
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); padding: 0.45rem 0.9rem;
+  border-radius: 6px; cursor: pointer; font-size: 0.83rem;
+  transition: all .2s;
+}
+.btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.sm { padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+.btn.full { width: 100%; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn:disabled:hover { background: var(--bg2); border-color: var(--border); color: var(--text); }
+
+select {
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); padding: 0.3rem 0.5rem;
+  border-radius: 4px; font-size: 0.83rem;
+}
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+
+/* --- Engine readout: big SAN for best move; PV in monospace --- */
+.big-move { font-size: 2rem; font-weight: 700; color: var(--accent); text-align: center; padding: 0.3rem; }
+.pv { font-size: 0.75rem; color: var(--muted); font-family: monospace; min-height: 1.2em; }
+
+/* --- Move list: scrollable; .mt = one clickable move token --- */
+.movelist { font-size: 0.83rem; font-family: monospace; max-height: 220px; overflow-y: auto; line-height: 1.9; }
+.movelist.annotated { max-height: 280px; }
+
+.mp { display: flex; gap: 0.3rem; align-items: baseline; flex-wrap: wrap; }
+.mn { color: var(--muted); min-width: 28px; }
+.mt { cursor: pointer; padding: 1px 4px; border-radius: 3px; }
+.mt:hover { background: var(--border); }
+.mt.cur { background: var(--accent); color: #fff; }
+
+/* Annotation colors (engine classifyMove in engine.js adds these classes) */
+.mt.best    { color: var(--purple); }
+.mt.great   { color: var(--cyan); }
+.mt.good    { color: var(--green); }
+.mt.inaccuracy { color: var(--yellow); }
+.mt.mistake { color: var(--orange); }
+.mt.blunder { color: var(--red); }
+
+/* --- Status line under buttons --- */
+.status { font-size: 0.8rem; color: var(--muted); text-align: center; margin-top: 0.5rem; min-height: 1.2em; font-style: italic; }
+.hint { font-size: 0.75rem; color: var(--muted); }
+
+/* --- chess.com username + load --- */
+.input-row { display: flex; gap: 0.6rem; margin-bottom: 1rem; }
+.txt-input {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); padding: 0.5rem 0.7rem;
+  border-radius: 6px; font-size: 0.85rem;
+}
+.txt-input:focus { outline: none; border-color: var(--accent); }
+
+/* --- Game picker list --- */
+#games-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 360px; overflow-y: auto; }
+
+.game-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.65rem 0.8rem;
+  cursor: pointer; transition: all .2s; font-size: 0.8rem;
+}
+.game-card:hover { border-color: var(--accent); }
+.game-card .gp { font-weight: 600; margin-bottom: 0.2rem; }
+.game-card .gm { color: var(--muted); }
+.win  { color: var(--green); }
+.loss { color: var(--red); }
+.draw { color: var(--yellow); }
+
+/* --- Parsed PGN headers in review --- */
+#game-info { font-size: 0.83rem; line-height: 1.9; color: var(--muted); }
+#game-info b { color: var(--text); }
+
+/* --- Post-analysis summary grid --- */
+.accuracy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.ac-item { background: var(--bg2); border-radius: 6px; padding: 0.5rem; text-align: center; }
+.ac-num { font-size: 1.2rem; font-weight: 700; }
+.ac-lbl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; }
+
+/* --- Puzzle feedback states (.ok / .err / .tip from JS) --- */
+.puzzle-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.3rem; }
+.feedback {
+  min-height: 1.8rem; padding: 0.35rem 0.5rem;
+  border-radius: 4px; font-size: 0.83rem;
+  margin: 0.4rem 0; text-align: center;
+}
+.feedback.ok   { background: rgba(63,185,80,.18); color: var(--green); }
+.feedback.err  { background: rgba(248,81,73,.18); color: var(--red); }
+.feedback.tip  { background: rgba(210,153,34,.18); color: var(--yellow); }
+
+.puzzle-stats { display: flex; gap: 1.2rem; }
+.stat { text-align: center; }
+.stat > div:first-child { font-size: 1.3rem; font-weight: 700; color: var(--accent); }
+.stat > div:last-child  { font-size: 0.72rem; color: var(--muted); }
+
+.solution-text { font-family: monospace; font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+
+/* --- Opening explorer text --- */
+.opening-name { font-size: 1.05rem; font-weight: 700; color: var(--accent); margin-bottom: 0.2rem; }
+.opening-eco  { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.4rem; }
+.opening-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.55; }
+
+#continuations { display: flex; flex-direction: column; gap: 0.35rem; max-height: 220px; overflow-y: auto; }
+.cont-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.4rem 0.6rem; background: var(--bg2);
+  border-radius: 4px; cursor: pointer; font-size: 0.83rem; transition: all .2s;
+}
+.cont-item:hover { background: var(--border); }
+.cont-move { font-family: monospace; font-weight: 700; color: var(--accent); }
+.cont-name { font-size: 0.75rem; color: var(--muted); }
+
+/* --- Square highlights (jQuery adds these classes to .square-XX in app.js) --- */
+.sq-hl-from { box-shadow: inset 0 0 0 3px rgba(255,215,0,.7) !important; }
+.sq-hl-to   { box-shadow: inset 0 0 0 3px rgba(255,140,0,.7) !important; }
+
+/* --- Loading / spinner (injected HTML from JS) --- */
+.loading { color: var(--muted); font-size: 0.83rem; padding: 0.8rem; text-align: center; }
+.spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .7s linear infinite;
+  vertical-align: middle; margin-right: 0.4rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- Responsive: stack board above panel on phones; shrink board --- */
+@media (max-width: 1050px) {
+  .board, .board-alone { width: 400px; height: 400px; }
+  .eval-bar { height: 400px; }
+}
+@media (max-width: 860px) {
+  .board, .board-alone { width: 340px; height: 340px; }
+  .eval-bar { height: 340px; }
+  .tab-content.active { flex-direction: column; }
+  .panel { max-width: 100%; }
+}
+@media (max-width: 520px) {
+  .board, .board-alone { width: 290px; height: 290px; }
+  .eval-bar { height: 290px; }
+  main { padding: 1rem; }
+}
