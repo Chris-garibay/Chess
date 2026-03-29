@@ -1,16 +1,35 @@
 /**
  * ============================================================================
- * CHESS COACH — style.css
+ * CHESS COACH — style.css (HOW THE PAGE LOOKS)
  * ============================================================================
- * TEACHING NOTES:
- * - :root defines CSS *custom properties* (variables). Use var(--name) so you
- *   can change the whole theme in one place — great for dark mode or rebranding.
- * - Layout is mostly Flexbox: display:flex + gap aligns rows/columns without
- *   fragile float hacks.
- * - .tab-content uses display:none by default; .tab-content.active uses
- *   display:flex — that show/hide is toggled from JavaScript in app.js.
- * - chessboard-js draws the board inside a div; we fix .board width/height so
- *   squares stay square. Media queries shrink the board on narrow screens.
+ *
+ * RELATION TO HTML (if you are new to both)
+ * - HTML files list *elements* (structure). This file *selects* those elements
+ *   and assigns visuals: colors, spacing, fonts, visibility, layout.
+ * - Example: in HTML, <button class="btn"> has class "btn". Below, the rule
+ *   `.btn { ... }` applies to every element with that class.
+ * - `#games-list` selects the single element with id="games-list" in index.html.
+ *
+ * THIS IS NOT EXPRESS
+ * - Express serves files or JSON from a *server*. CSS never runs on Express by
+ *   itself; the *browser* downloads style.css and applies these rules on your
+ *   computer when it renders the page.
+ *
+ * HOW RULES WORK
+ * - `selector { property: value; }`
+ * - Comments in CSS use slash-star like this block.
+ *
+ * KEY IDEAS IN THIS FILE
+ * - :root { --accent: #58a6ff; } defines *custom properties* (variables).
+ *   Later, `color: var(--accent)` reuses that color everywhere — change once,
+ *   update the whole theme.
+ * - Flexbox: `display: flex` makes a row or column of children; `gap` adds
+ *   space between them without manual margins on every child.
+ * - `.tab-content` is hidden with `display: none`. When JavaScript adds the
+ *   extra class `active`, the rule `.tab-content.active` wins and uses
+ *   `display: flex` — that is how tabs switch without separate HTML pages.
+ * - chessboard-js draws inside a fixed-size div; we set .board width/height
+ *   so the board stays square. `@media` blocks *override* sizes on small screens.
  * ============================================================================
  */
 

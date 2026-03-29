@@ -2,14 +2,28 @@
  * ============================================================================
  * chesscom.js — chess.com public (unauthenticated) HTTP API
  * ============================================================================
- * TEACHING NOTES:
  *
- * - fetch(url) returns a Promise. We use async/await for readable linear code.
- * - chess.com documents these endpoints under "Public API" — no API key for
- *   the data we use, but *rate limits* and CORS still apply. Opening the app
- *   from file:// may block fetch; serve over http(s) for demos.
- * - PGN (Portable Game Notation) is text: headers in [brackets], then moves.
- *   chess.js can load_pgn() and replay moves to build FEN at each step.
+ * IF YOU EXPECTED EXPRESS: THIS FILE IS STILL BROWSER JAVASCRIPT
+ * - In many tutorials, the *server* (often written with Express in Node.js)
+ *   calls other APIs and hides secret keys. Here there is no secret key: the
+ *   chess.com endpoints are *public*, so the browser can call them directly
+ *   with fetch().
+ * - fetch('https://api.chess.com/...') goes from the user's browser straight
+ *   to chess.com (subject to CORS rules). No app.get('/games') on your machine
+ *   unless you build that yourself as a separate project.
+ *
+ * async / await (READ THIS IF IT LOOKS STRANGE)
+ * - Network requests take time. fetch does not freeze the page; it returns a
+ *   Promise. `await fetch(...)` means "pause *this function* until the
+ *   response arrives, then continue". The function must be marked `async`.
+ * - `.json()` also returns a Promise — we await it to get a plain JavaScript
+ *   object from the HTTP body.
+ *
+ * OTHER NOTES
+ * - Rate limits and CORS still apply. Opening index.html as file:// sometimes
+ *   breaks fetch; use a simple static server (e.g. `npx serve`) for class demos.
+ * - PGN = text format for games: headers in [brackets], then moves. chess.js
+ *   loads PGN and can replay moves to produce FEN at each step.
  *
  * Global: ChessCom — used by app.js for games list, daily puzzle, etc.
  * ============================================================================

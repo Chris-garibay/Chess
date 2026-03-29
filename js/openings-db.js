@@ -2,6 +2,14 @@
  * ============================================================================
  * openings-db.js — small opening "book" for the Openings tab
  * ============================================================================
+ *
+ * NOT EXPRESS / NOT A DATABASE SERVER
+ * - This file is just JavaScript *data* (an array of objects) plus two helper
+ *   functions. It loads in the browser like any other script. There is no SQL,
+ *   no MongoDB, no app.get('/openings') — compare to an Express API that would
+ *   query a DB and return JSON; here the "database" is literally the OPENINGS
+ *   constant in this file.
+ *
  * TEACHING NOTES:
  *
  * - ECO = Encyclopedia of Chess Openings classification (codes like B90, C60).

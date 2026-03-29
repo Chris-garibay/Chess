@@ -2,6 +2,13 @@
  * ============================================================================
  * engine.js — Stockfish chess engine + optional Lichess cloud fallback
  * ============================================================================
+ *
+ * NOT EXPRESS / NOT A SERVER ROUTE
+ * - Nothing here defines HTTP routes (no app.post, no res.json). This class runs
+ *   entirely in the *browser*: it talks to a Web Worker running Stockfish, or
+ *   uses fetch() to Lichess's cloud-eval URL. app.js calls engine.analyze(...)
+ *   like any other JavaScript function.
+ *
  * TEACHING NOTES (read with a student):
  *
  * 1) What is UCI?
