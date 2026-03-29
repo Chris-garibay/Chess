@@ -2,14 +2,49 @@
  * ============================================================================
  * app.js — Chess Coach UI + game logic (main entry after libraries load)
  * ============================================================================
- * TEACHING MAP (suggested lesson order):
  *
+ * READ THIS FIRST IF YOU KNOW EXPRESS BUT NOT THIS PROJECT
+ * ----------------------------------------------------------------------------
+ * Express is a *server-side* framework (Node.js). You define routes like
+ *   app.get('/users', (req, res) => res.json(...))
+ * and the *server* sends responses to browsers.
+ *
+ * This project has **no Express** in the repo for the chess UI. Instead:
+ * - index.html is a static document the browser loads.
+ * - This file runs in the *browser* after the page loads. It uses the DOM API:
+ *   document.getElementById, addEventListener, element.classList, etc.
+ * - "Business logic" (chess rules) lives in the chess.js library; we call
+ *   `new Chess()` and methods like .move(), .fen(), .game_over().
+ * - When we need remote data, chesscom.js uses fetch() from the *browser* to
+ *   chess.com — not to your own Express app (unless you add one later).
+ *
+ * THE DOM (Document Object Model) IN ONE PARAGRAPH
+ * ----------------------------------------------------------------------------
+ * The browser parses HTML into a tree of objects. Each tag becomes a *node*.
+ * JavaScript can *query* nodes (by id, class, CSS selector) and *change* them:
+ * text, CSS classes, inline styles, or innerHTML. That is how clicking "Practice"
+ * hides one panel and shows another without reloading the page.
+ *
+ * COMMON PATTERNS IN THIS FILE
+ * ----------------------------------------------------------------------------
+ * - document.getElementById('new-game') — returns ONE element; null if missing.
+ * - document.querySelectorAll('.tab-btn') — returns a *NodeList* of all matches.
+ * - .addEventListener('click', () => { ... }) — run code when user clicks.
+ * - element.classList.add('active') / .remove('active') — toggle CSS classes
+ *   (tabs and buttons use .active; rules live in style.css).
+ * - element.innerHTML = '<div>...</div>' — replace contents with an HTML string
+ *   (handy for lists; avoid putting raw user input in HTML to reduce XSS risk).
+ * - async () => { await ChessCom.getRecentGames(...) } — the click handler can
+ *   `await` network calls without blocking painting of the page.
+ *
+ * TEACHING MAP (suggested lesson order)
+ * ----------------------------------------------------------------------------
  * 1) Separation of concerns
  *    - chess.js  → `Chess` instance holds rules, FEN, history (no pixels).
  *    - chessboard-js → `Chessboard(id, options)` draws pieces; callbacks ask
  *      chess.js if a drag/drop is legal.
  *    - engine.js → analysis (Stockfish / cloud).
- *    - chesscom.js → HTTP API.
+ *    - chesscom.js → HTTP API (fetch).
  *    - openings-db.js → static opening tree lookup.
  *
  * 2) This file glues DOM events to those pieces: each tab has init*() lazily
@@ -29,8 +64,10 @@ const PIECES = 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  TAB NAVIGATION
-//  One set of buttons .tab-btn; panels .tab-content with id tab-<name>.
-//  Only one panel has .active at a time (see style.css).
+//
+//  HTML: each <button class="tab-btn" data-tab="practice"> pairs with
+//  <div id="tab-practice" class="tab-content">. We keep "active" in sync on the
+//  button and the panel so CSS shows one screen (display:flex vs display:none).
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Remembers which tabs already ran their init*() so we only build boards once. */
@@ -41,12 +78,14 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
+    // data-tab="review" → btn.dataset.tab === "review" (dataset is camelCase in JS)
     const id = btn.dataset.tab;
     document.getElementById(`tab-${id}`).classList.add('active');
     if (!tabInited[id]) { tabInited[id] = true; initTab(id); }
   });
 });
 
+/** Route string from tab button to the right initializer (practice loads at page bottom). */
 function initTab(id) {
   if (id === 'review')   initReview();
   if (id === 'puzzles')  initPuzzles();
@@ -56,6 +95,11 @@ function initTab(id) {
 /**
  * Yellow/orange ring on "from" and "to" squares after a move (uses CSS in style.css).
  * chessboard-js gives squares classes like .square-e4 — we add sq-hl-from / sq-hl-to.
+ *
+ * jQuery: `$` is a function from the jQuery library (loaded before this file).
+ * `$('#practice-board')` means "find element with id practice-board", like
+ * document.getElementById but with extra helpers. The backticks are *template
+ * literals*: `#${boardId}` inserts the variable into the string.
  */
 function hlSquares(boardId, from, to) {
   $(`#${boardId} .square-55d63`).removeClass('sq-hl-from sq-hl-to');
@@ -70,6 +114,8 @@ function hlSquares(boardId, from, to) {
  * @param {string} labelId - text label (e.g. +0.3 or M2)
  */
 function setEvalBar(whiteId, labelId, score, turn) {
+  // document.getElementById returns a DOM element; .style.height changes inline CSS.
+  // .textContent sets visible text (safer than innerHTML when you only need plain text).
   let pct; // percentage of bar that is WHITE (top = black, bottom = white)
   if (!score) { pct = 50; }
   else if (score.type === 'mate') {
@@ -91,6 +137,8 @@ function setEvalBar(whiteId, labelId, score, turn) {
  * @param {function|null} onClickFn - if set, clicking a move jumps review to that index
  */
 function renderMoves(containerId, moves, currentIdx, annotations, onClickFn) {
+  // We build one big HTML string, then assign it once — faster than dozens of
+  // createElement calls for teaching-sized lists. Template literals `${}` embed values.
   let html = '';
   for (let i = 0; i < moves.length; i += 2) {
     const mn = Math.floor(i / 2) + 1;
@@ -108,6 +156,8 @@ function renderMoves(containerId, moves, currentIdx, annotations, onClickFn) {
   }
   const container = document.getElementById(containerId);
   container.innerHTML = html;
+  // After innerHTML, new nodes exist but have no listeners — we attach them now.
+  // data-idx on each .mt holds which ply index to jump to when clicked (review tab).
   if (onClickFn) {
     container.querySelectorAll('.mt').forEach(el => {
       el.addEventListener('click', () => onClickFn(parseInt(el.dataset.idx)));
@@ -136,7 +186,10 @@ let practiceMode = 'engine';
 /** Prevents double-clicks while engine is thinking (async callback in flight). */
 let engineBusy   = false;
 
+// An IIFE = Immediately Invoked Function Expression: (function(){ ... })();
+// Runs once as soon as app.js loads so the practice board exists on first paint.
 (function initPractice() {
+  // 'practice-board' must match id="practice-board" in index.html exactly.
   practiceBoard = Chessboard('practice-board', {
     draggable: true,
     position: 'start',
@@ -262,6 +315,7 @@ function setPracticeStatus(msg) {
 }
 
 // --- Practice controls ---
+// Each line wires ONE HTML id to ONE event. The browser calls our function on click.
 document.getElementById('new-game').addEventListener('click', () => {
   practiceGame = new Chess();
   practiceBoard.start();
@@ -332,6 +386,9 @@ function initReview() {
   });
 }
 
+// async click handler: we can use `await` inside. While waiting for chess.com,
+// the page stays responsive. try/catch turns network/API errors into a message
+// in the list area instead of an uncaught error in the console.
 document.getElementById('load-games').addEventListener('click', async () => {
   const user = document.getElementById('cc-username').value.trim();
   if (!user) return;
@@ -341,11 +398,13 @@ document.getElementById('load-games').addEventListener('click', async () => {
     const games = await ChessCom.getRecentGames(user, 15);
     if (!games.length) { listEl.innerHTML = '<div class="loading">No games found.</div>'; return; }
     listEl.innerHTML = '';
+    // forEach: run a function for every game in the array (no Express loop — plain JS).
     games.forEach(game => {
       const p = ChessCom.parseGameResult(game, user);
       const date = new Date(p.endTime * 1000).toLocaleDateString();
       const sym  = p.result === 'win' ? '✓' : p.result === 'loss' ? '✗' : '½';
       const cls  = p.result;
+      // document.createElement builds a node in memory; appendChild attaches it to the DOM.
       const div  = document.createElement('div');
       div.className = 'game-card';
       div.innerHTML = `<div class="gp"><span class="${cls}">${sym}</span> ${p.myName} (${p.myRating}) vs ${p.oppName} (${p.oppRating})</div>
@@ -365,6 +424,7 @@ function loadGameForReview(game, parsed) {
   reviewAnnotations = [];
   reviewIdx        = 0;
 
+  // Inline style overrides CSS: these panels start as display:none in index.html.
   document.getElementById('review-board-wrap').style.display = 'flex';
   document.getElementById('review-panel').style.display     = 'flex';
   document.getElementById('accuracy-card').style.display    = 'none';
@@ -408,6 +468,8 @@ document.getElementById('rv-prev').addEventListener('click',  () => goToReviewId
 document.getElementById('rv-next').addEventListener('click',  () => goToReviewIdx(reviewIdx + 1));
 document.getElementById('rv-last').addEventListener('click',  () => goToReviewIdx(reviewPositions.length - 1));
 
+// Global key listener: only acts when Review tab is active (guard clauses).
+// e.preventDefault() stops the browser from scrolling the page when using arrows.
 document.addEventListener('keydown', (e) => {
   if (!document.getElementById('tab-review').classList.contains('active')) return;
   if (!reviewPositions.length) return;
@@ -415,6 +477,9 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') { e.preventDefault(); goToReviewIdx(reviewIdx + 1); }
 });
 
+// Sequential await in a for loop: each eval finishes before the next starts.
+// This is simple but slow for long games — a server (Express + queue) could batch
+// work, but this app keeps everything client-side for teaching clarity.
 document.getElementById('analyze-game').addEventListener('click', async () => {
   if (!reviewPositions.length) return;
   const btn = document.getElementById('analyze-game');
@@ -430,6 +495,7 @@ document.getElementById('analyze-game').addEventListener('click', async () => {
 
   reviewAnnotations = [];
   const tally = { best:0, great:0, good:0, inaccuracy:0, mistake:0, blunder:0 };
+  // Compare eval before vs after each move to label quality (engine.classifyMove).
   for (let i = 1; i < reviewPositions.length; i++) {
     const turn = reviewPositions[i - 1].turn;
     const ann  = engine.classifyMove(scores[i - 1], scores[i], turn);
@@ -440,6 +506,7 @@ document.getElementById('analyze-game').addEventListener('click', async () => {
   renderMoves('review-moves', reviewMoves, reviewIdx, reviewAnnotations, goToReviewIdx);
 
   document.getElementById('accuracy-card').style.display = 'block';
+  // .map builds an array of HTML strings; .join('') concatenates into one assignment.
   document.getElementById('accuracy-grid').innerHTML = [
     ['blunder','??','var(--red)'],
     ['mistake','?','var(--orange)'],
@@ -650,7 +717,9 @@ function updatePuzzleStats() {
 // ═══════════════════════════════════════════════════════════════════════════
 //  OPENING EXPLORER TAB
 //  openingsGame + openingsBoard; after each move we match UCI history against
-//  OPENINGS in openings-db.js and show name / ECO / continuations.
+//  the OPENINGS array in openings-db.js (plain data — no database, no Express).
+//  updateContinuations() fills <div id="continuations"> with clickable rows
+//  built from strings (same innerHTML pattern as renderMoves).
 // ═══════════════════════════════════════════════════════════════════════════
 
 let openingsBoard;

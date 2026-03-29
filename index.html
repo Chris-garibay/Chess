@@ -1,43 +1,85 @@
 <!--
   =============================================================================
-  CHESS COACH — index.html (page structure)
+  CHESS COACH — index.html (PAGE STRUCTURE FOR BEGINNERS)
   =============================================================================
-  TEACHING NOTES:
-  - This is a "single-page app" layout: one HTML file, four logical screens
-    (tabs). Only one <main> section is visible at a time; JavaScript toggles
-    the .active class on tab buttons and matching .tab-content panels.
-  - External libraries (loaded at the bottom):
-    • jQuery          — DOM helpers; chessboard-js expects it.
-    • chess.js        — rules, FEN, legal moves, PGN (no graphics).
-    • chessboard-js   — draggable board UI (needs chess.js for game logic).
-  - Our scripts run AFTER those libraries so `Chess`, `Chessboard`, and `$`
-    exist when app.js runs. Order matters: engine → chesscom → openings-db → app.
+
+  WHAT IS HTML?
+  - HTML = HyperText Markup Language. You write *elements* (tags) that tell the
+    browser what things *are*: a heading, a button, a paragraph, a container.
+  - Most elements look like: <tagname>content</tagname>
+    Some are "empty" and close themselves: <meta ...> or <input ...>
+  - Elements can nest: <div><p>Hello</p></div> means a paragraph inside a box.
+
+  IMPORTANT: THIS PROJECT DOES **NOT** USE EXPRESS (OR ANY NODE SERVER FOR THE UI)
+  - Express is a *Node.js* library for building a *web server* (programs that listen
+    on a port and send HTML/JSON). You might see routes like app.get('/api', ...).
+  - Chess Coach is a *static* front-end: the browser opens this .html file (or a
+    simple file host serves it). All interactivity runs in the *browser* via the
+    <script> tags at the bottom — that is *client-side* JavaScript.
+  - When we need data from the internet (chess.com), the *browser* uses fetch()
+    directly to chess.com's public API. No Express in the middle unless *you* add
+    your own backend later.
+
+  HOW THE PAGE IS ORGANIZED
+  - <!DOCTYPE html> tells the browser "this is modern HTML5".
+  - <html> wraps the whole document. lang="en" helps screen readers and search engines.
+  - <head> = invisible setup: title in the tab, character encoding, linked CSS.
+  - <body> = what the user actually sees on the page.
+
+  id vs class (VERY COMMON CONFUSION)
+  - id="practice-board" must be *unique* on the page. JavaScript uses it to find
+    one exact element: document.getElementById('practice-board').
+  - class="btn" can appear on *many* elements. CSS and JS can style/select all
+    buttons at once: .btn { ... } or document.querySelectorAll('.tab-btn').
+
+  data-* ATTRIBUTES (CUSTOM DATA FOR JAVASCRIPT)
+  - Example: <button data-tab="practice"> — there is no built-in HTML meaning.
+    Our script reads btn.dataset.tab in app.js to know which panel to show.
+
+  SINGLE-PAGE "TABS"
+  - All four sections (Practice, Review, Puzzles, Openings) exist in the HTML at
+    once, but CSS hides inactive ones (display: none). JavaScript only adds the
+    class "active" to the tab you clicked and its matching panel.
+
+  SCRIPTS AT THE BOTTOM (WHY?)
+  - The browser reads HTML top-to-bottom. If app.js ran before the DOM existed,
+    getElementById would find nothing. Scripts at the end run after the buttons
+    and divs above are parsed.
+  - Order also matters for *dependencies*: chess.js must load before our code
+    that says `new Chess()`.
+
+  EXTERNAL LIBRARIES (loaded from CDN = someone else's server)
+  - jQuery ($), chess.js (Chess), chessboard-js (Chessboard) — see script tags.
   =============================================================================
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- UTF-8 supports chess symbols and all languages -->
+  <!-- Character encoding: how bytes map to letters; UTF-8 includes ♛ and emoji -->
   <meta charset="UTF-8">
-  <!-- Viewport: mobile browsers scale the page sensibly -->
+  <!-- On phones, "viewport" makes the page scale to screen width instead of
+       behaving like a tiny desktop window -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Shown in the browser tab; not a visible heading on the page -->
   <title>Chess Coach</title>
-  <!-- Our theme and layout (colors, flex, cards, board size) -->
+  <!-- rel="stylesheet" means "this link is CSS". href is the file path/URL. -->
   <link rel="stylesheet" href="style.css">
-  <!-- chessboard-js default piece/board skin (square classes it injects) -->
+  <!-- Third-party CSS for the chess board look (squares, dragged pieces) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
 </head>
 <body>
 
-<!-- Site title bar (static) -->
+<!-- Semantic tag: screen readers know this is a site header, not main content -->
 <header>
   <div class="logo">♛ Chess Coach</div>
   <div class="subtitle">Stockfish · chess.com · Opening Explorer</div>
 </header>
 
 <!--
-  Tab bar: each button has data-tab="practice|review|puzzles|openings".
-  app.js listens for clicks, shows #tab-<name>, and calls initTab() once per tab.
+  <nav> = navigation landmark. <button> is focusable and keyboard-activable
+  (better than <div onclick> for accessibility).
+
+  "active" on the first tab matches the first visible panel below (both use CSS).
 -->
 <nav class="tabs">
   <button class="tab-btn active" data-tab="practice">⚔ Practice</button>
@@ -46,11 +88,16 @@
   <button class="tab-btn" data-tab="openings">📖 Openings</button>
 </nav>
 
+<!--
+  <main> wraps the primary content (good for accessibility).
+  Each tab is a <div> with id tab-* so JS can do getElementById('tab-review').
+-->
 <main>
 
   <!-- ========== PRACTICE TAB ==========
-       Live board + optional engine opponent. IDs here are wired in app.js:
-       practice-board, eval bar, history, depth slider, etc. -->
+       id="tab-practice" + class="tab-content active" → visible by default.
+       Removing "active" from here and putting it on another tab-* div switches
+       screens (done in app.js). -->
   <div id="tab-practice" class="tab-content active">
     <div class="board-wrap">
       <!-- Eval bar: JS sets height of #eval-white from engine score -->
@@ -74,7 +121,7 @@
         </div>
         <div class="row">
           <span class="lbl">Mode</span>
-          <!-- engine = you vs Stockfish; analysis = engine hints only; free = no engine -->
+          <!-- <select> dropdown: each <option value="..."> becomes this.value in JS -->
           <select id="practice-mode">
             <option value="engine">vs Engine</option>
             <option value="analysis">Analysis</option>
@@ -82,6 +129,7 @@
           </select>
         </div>
         <div class="row">
+          <!-- id="depth-val" is updated when the slider moves (see app.js input listener) -->
           <span class="lbl">Strength <span id="depth-val">12</span></span>
           <input type="range" id="engine-depth" min="1" max="20" value="12">
         </div>
@@ -89,12 +137,15 @@
 
       <div class="card">
         <div class="card-title">Best Move</div>
+        <!-- Engine writes SAN here; starts as an em dash until analysis returns -->
         <div id="best-move" class="big-move">—</div>
+        <!-- PV = principal variation (expected continuation line) -->
         <div id="pv-line" class="pv"></div>
       </div>
 
       <div class="card">
         <div class="card-title">Move History</div>
+        <!-- Empty at first; app.js injects move rows as innerHTML -->
         <div id="practice-history" class="movelist"></div>
       </div>
 
@@ -121,7 +172,7 @@
       <div id="games-list"></div>
     </div>
 
-    <!-- Hidden until a game is selected (see loadGameForReview in app.js) -->
+    <!-- inline style="display:none" hides this until JS sets style.display = 'flex' -->
     <div id="review-board-wrap" class="board-wrap" style="display:none">
       <div class="eval-bar">
         <div class="eval-white" id="rv-eval-white"></div>
@@ -225,6 +276,12 @@
 </main>
 
 <!--
+  SCRIPTS — NOT EXPRESS, NOT A BUNDLER
+  - Each <script src="..."> downloads and runs a file. That creates global
+    variables (e.g. Chess, $, engine) the next script can use.
+  - In a larger app you might use npm + Express + React; here we keep it simple:
+    plain files and CDNs.
+
   Script order (dependencies):
   1. jQuery — required by chessboard-js
   2. chess.js — game state (used everywhere)
@@ -232,7 +289,7 @@
   4. engine.js — defines global `engine`
   5. chesscom.js — defines global `ChessCom`
   6. openings-db.js — lookupOpening, getContinuations
-  7. app.js — ties UI to logic
+  7. app.js — ties UI to logic (runs last; uses everything above)
 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
